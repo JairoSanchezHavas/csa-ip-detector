@@ -35,25 +35,37 @@ Puedes crear los archivos utilizando el **Cloud Shell Editor** (botón *Open Edi
    ```bash
    cat << 'EOF' > main.py
    import hashlib
+   import ipaddress
    import json
    import functions_framework
    from flask import Request, Response
+
+   def clean_ip(ip_str: str) -> str:
+       ip_str = ip_str.strip()
+       if ip_str.startswith("["):
+           end_bracket = ip_str.find("]")
+           if end_bracket != -1:
+               ip_str = ip_str[1:end_bracket]
+       elif ip_str.count(":") == 1 and "." in ip_str:
+           ip_str = ip_str.split(":")[0]
+
+       try:
+           return str(ipaddress.ip_address(ip_str))
+       except ValueError:
+           return ip_str
 
    def extract_client_ip(request: Request) -> str:
        x_forwarded_for = request.headers.get("X-Forwarded-For")
        if x_forwarded_for:
            ip_list = [ip.strip() for ip in x_forwarded_for.split(",")]
            if ip_list and ip_list[0]:
-               client_ip = ip_list[0]
-               if ":" in client_ip and not client_ip.startswith("["):
-                   client_ip = client_ip.split(":")[0]
-               return client_ip
+               return clean_ip(ip_list[0])
 
        x_real_ip = request.headers.get("X-Real-IP")
        if x_real_ip:
-           return x_real_ip.strip()
+           return clean_ip(x_real_ip)
 
-       return request.remote_addr or "127.0.0.1"
+       return clean_ip(request.remote_addr or "127.0.0.1")
 
    @functions_framework.http
    def get_client_ip(request: Request):
